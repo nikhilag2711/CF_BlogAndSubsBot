@@ -3,5 +3,6 @@ random
 discord
 json
 requests
+re
 dotenv
 discord.ext

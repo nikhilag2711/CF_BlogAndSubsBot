@@ -3,6 +3,7 @@ import random
 import discord
 import json
 import requests
+import re
 
 from dotenv import load_dotenv
 from discord.ext import commands
@@ -59,43 +60,17 @@ async def blog_of_user(ctx, handle):
     data = json.loads(obj.text)
 
     if data['status'] == "FAILED":
-        await ctx.send('Some other error.')
+        await ctx.send(f'{data["comment"]}')
     elif len(data['result']) == 0:
         await ctx.send(f'{handle} is dumb. (S)he has written no blogs.')
     else:
         blog_id = data['result'][0]['id']
+        embed = discord.Embed(title=f'{handle}\'s latest blog :', color=0x000000)
         latest_blog = f'https://codeforces.com/blog/entry/{blog_id}'
+        title = re.sub(r'<.*?>', '', data['result'][0]['title'])
+        embed.add_field(name=f'{title}', value=f'Upvotes={data["result"][0]["rating"]}, [Link to the blog]({latest_blog})', inline=False)
 
-        await ctx.send(f'{handle}\'s latest blog link : {latest_blog}')
-
-@bot.command(name='last5_blogs', help='List user\'s latest 5 blogs.')
-async def blog_of_user(ctx, handle):
-    url = f'https://codeforces.com/api/user.blogEntries?handle={handle}'
-    obj = requests.get(url)
-    data = json.loads(obj.text)
-
-    if data['status'] == "FAILED":
-        await ctx.send('Some other error.')
-    elif len(data['result']) == 0:
-        await ctx.send(f'{handle} is dumb. (S)he has written no blogs.')
-    else:
-        stop_id = data['result'][-1]['id']
-        var = 0
-        ans = []
-        while(len(ans) < 5):
-            latest_blog = f'https://codeforces.com/blog/entry/{data["result"][var]["id"]}'
-            ans.append(latest_blog)
-            if(data['result'][var]['id'] == stop_id):
-                break
-            var = var + 1
-
-        to_print = f'```\n{handle}\'s latest blog links :\n\n'
-        for i in range(len(ans)):
-            tmp = f'{i+1} : {ans[i]}\n'
-            to_print += tmp
-        to_print += '```'
-
-        await ctx.send(to_print)
+        await ctx.channel.send(embed=embed)
 
 @bot.command(name='first_blog', help='List user\'s first blog.')
 async def blog_of_user(ctx, handle):
@@ -104,14 +79,52 @@ async def blog_of_user(ctx, handle):
     data = json.loads(obj.text)
 
     if data['status'] == "FAILED":
-        await ctx.send('Some other error.')
+        await ctx.send(f'{data["comment"]}')
     elif len(data['result']) == 0:
         await ctx.send(f'{handle} is dumb. (S)he has written no blogs.')
     else:
         blog_id = data['result'][-1]['id']
+        embed = discord.Embed(title=f'{handle}\'s latest blog :', color=0x000000)
+        title = re.sub(r'<.*?>', '', data['result'][-1]['title'])
         first_blog = f'https://codeforces.com/blog/entry/{blog_id}'
+        embed.add_field(name=f'{title}', value=f'Upvotes={data["result"][-1]["rating"]}, [Link to the blog]({first_blog})', inline=False)
+        
+        await ctx.channel.send(embed=embed)
 
-        await ctx.send(f'{handle}\'s first blog link : {first_blog}')
+@bot.command(name='last5_blogs', help='List user\'s latest 5 blogs.')
+async def blog_of_user(ctx, handle, upvotes:int = None):
+    url = f'https://codeforces.com/api/user.blogEntries?handle={handle}'
+    obj = requests.get(url)
+    data = json.loads(obj.text)
+
+    if data['status'] == "FAILED":
+        await ctx.send(f'{data["comment"]}')
+    elif len(data['result']) == 0:
+        await ctx.send(f'{handle} is dumb. (S)he has written no blogs.')
+    else:
+        stop_id = data['result'][-1]['id']
+        var = 0
+        ans = []
+        embed = discord.Embed(title=f'{handle}\'s latest blog list :', color=0x000000)
+        while(len(ans) < 5):
+            latest_blog = f'https://codeforces.com/blog/entry/{data["result"][var]["id"]}'
+            title = re.sub(r'<.*?>', '', data['result'][var]['title'])
+            if upvotes is not None :
+                if data['result'][var]['rating'] >= upvotes:
+                    embed.add_field(name=f'{len(ans)+1}. {title}', value=f'Upvotes={data["result"][var]["rating"]}, [Link to the blog]({latest_blog})', inline=False)
+                    ans.append(latest_blog)
+            else:
+                embed.add_field(name=f'{len(ans)+1}. {title}', value=f'Upvotes={data["result"][var]["rating"]}, [Link to the blog]({latest_blog})', inline=False)
+                ans.append(latest_blog)
+            if(data['result'][var]['id'] == stop_id):
+                break
+            var = var + 1
+
+        if upvotes is not None and len(ans) == 0:
+            await ctx.send(f'{handle} have no blog having upvotes >= {upvotes}')
+            return
+
+        await ctx.channel.send(embed=embed)
 
 @bot.command(name='first5_blogs', help='List user\'s first 5 blogs.')
 async def blog_of_user(ctx, handle):
@@ -120,26 +133,23 @@ async def blog_of_user(ctx, handle):
     data = json.loads(obj.text)
 
     if data['status'] == "FAILED":
-        await ctx.send('Some other error.')
+        await ctx.send(f'{data["comment"]}')
     elif len(data['result']) == 0:
         await ctx.send(f'{handle} is dumb. (S)he has written no blogs.')
     else:
         stop_id = data['result'][0]['id']
         var = -1
         ans = []
+        embed = discord.Embed(title=f'{handle}\'s latest blog list :', color=0x000000)
         while(len(ans) < 5):
             latest_blog = f'https://codeforces.com/blog/entry/{data["result"][var]["id"]}'
+            title = re.sub(r'<.*?>', '', data['result'][var]['title'])
+            embed.add_field(name=f'{len(ans)+1}. {title}', value=f'Upvotes={data["result"][var]["rating"]}, [Link to the blog]({latest_blog})', inline=False)
             ans.append(latest_blog)
             if(data['result'][var]['id'] == stop_id):
                 break
             var = var - 1
 
-        to_print = f'```\n{handle}\'s latest blog links :\n\n'
-        for i in range(len(ans)):
-            tmp = f'{i+1} : {ans[i]}\n'
-            to_print += tmp
-        to_print += '```'
-
-        await ctx.send(to_print)
+        await ctx.channel.send(embed=embed)
 
 bot.run(TOKEN)
