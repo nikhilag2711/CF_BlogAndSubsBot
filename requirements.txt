@@ -1,0 +1,7 @@
+os
+random
+discord
+json
+requests
+dotenv
+discord.ext
