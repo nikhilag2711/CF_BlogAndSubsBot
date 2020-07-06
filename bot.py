@@ -1,4 +1,4 @@
-import os, random, discord, json, requests, re, datetime, helper
+import os, asyncio, random, discord, json, requests, re, datetime, helper
 from dotenv import load_dotenv
 from discord.ext import commands
 load_dotenv()
@@ -105,7 +105,6 @@ async def blog_of_user(ctx, handle, *args) :
                     blg = helper.tag_match(tags, latest_blog)
                     if blg != False and blg not in ans:
                         ans.append(blg)
-                        print(ans)
                 else :
                     ans.append(latest_blog)
             if(data['result'][var]['id'] == stop_id):
@@ -130,5 +129,136 @@ async def blog_of_user(ctx, handle, *args) :
                     break
             
             await ctx.channel.send(embed=embed)
+
+@bot.command(name='status', help='Returns the problems solved by a user in a specific contest.', usage='handle id [+ac] [+contest] [+practice] [+unofficial] [+virtual]')
+async def userContestStatus(ctx, handle, id, *args) :
+    if helper.isValidInteger(id) == False:
+        await ctx.send('Specify the contest id in integer format only.')
+        return
+    
+    id = helper.isValidInteger(id)
+    url = f'https://codeforces.com/api/user.status?handle={handle}&from=1'
+    obj = requests.get(url)
+    data = json.loads(obj.text)
+    
+    if data['status'] == "FAILED" :
+        await ctx.send(f'{data["comment"]}')
+    elif len(data['result']) == 0:
+        await ctx.send(f'{handle} has made no submissions yet.')
+    else:
+        stop_id = data['result'][-1]['id']
+        var = 0
+        ans = []
+        ac, official, virtual, practice, unoff = False, False, False, False, False
+
+        for arg in args:
+            if arg == '+ac':
+                ac = True
+            elif arg == '+contest':
+                official = True
+            elif arg == '+virtual':
+                virtual = True
+            elif arg == '+practice':
+                practice = True
+            elif arg == '+unofficial':
+                unoff = True
+            else :
+                await ctx.send('Invalid arguments. Please enter correct arguments and then try again.')
+                return
+
+        while(1):
+            if data['result'][var]['contestId'] == id:
+                ans.append(data['result'][var])
+            if data['result'][var]['id'] == stop_id:
+                break
+            var = var+1
+
+        embeds = []
+        if len(ans) == 0:
+            await ctx.send(f'{handle} has made no submissions in the contest having id = {id}.')
+        else:
+            var = 0
+            for subs in ans:
+                number = subs['problem']['index']
+                name = subs['problem']['name']
+                rat = subs['problem']['rating']
+                tag = subs['problem']['tags']
+                part = subs['author']['participantType']
+                verdict = subs['verdict']
+
+                tags = ""
+                for t in tag :
+                    if tags == "" :
+                        tags += t
+                    else :
+                        tags += ', ' + t
+
+                num = helper.check_status(ac, official, virtual, practice, unoff, verdict, part)
+                if num == 1:
+                    if var%5 == 0:
+                        embed = discord.Embed(title=f'{handle}\'s latest submissions in Contest {id} :', color=0x000000)
+                        embeds.append(embed)
+                    embeds[var//5].add_field(name=f'{number}. {name} [Rating = {rat}]', value=f'Tags : {tags}\nVerdict : {verdict}, Participation : {part}', inline=False)
+                    var = var + 1
+                if num == 2:
+                    if var%5 == 0:
+                        embed = discord.Embed(title=f'{handle}\'s latest submissions in Contest {id} :', color=0x000000)
+                        embeds.append(embed)
+                    embeds[var//5].add_field(name=f'{number}. {name}', value=f'Verdict : {verdict}, Participation : {part}', inline=False)
+                    var = var + 1
+            
+            if var%5 == 0:
+                var = var // 5
+            else :
+                var = var // 5 + 1
+            i = 1
+            for embed in embeds :
+                embed.set_footer(text=f'Page : {i}/{var}')
+                i = i+1
+
+            if var == 0:
+                await ctx.send(f'{handle} do not have any submission in the contest {id} with the given parameters.')
+            else:
+                message = await ctx.channel.send(embed=embeds[0])
+                emojis = ['\u23ee', '\u25c0', '\u25b6', '\u23ed']
+                for emoji in emojis:
+                    await message.add_reaction(emoji)
+
+                i, emoji = 0, ''
+                while True :
+                    if emoji == '\u23ee' :
+                        i = 0
+                        await message.edit(embed = embeds[i])
+                    if emoji == '\u25c0' :
+                        if i > 0 :
+                            i = i - 1
+                            await message.edit(embed=embeds[i])
+                    if emoji == '\u25b6' :
+                        if i < len(embeds) - 1 :
+                            i = i + 1
+                            await message.edit(embed=embeds[i])
+                    if emoji == '\u23ed' :
+                        i = len(embeds) - 1
+                        await message.edit(embed=embeds[i])
+                    
+                    def predicate(message):
+                        def check(reaction, user):
+                            if reaction.message.id != message.id or user == bot.user:
+                                return False
+                            for em in emojis :
+                                if reaction.emoji == em :
+                                    return True
+                            return False
+                        return check
+                    
+                    try:
+                        react, user = await bot.wait_for('reaction_add', timeout=15, check=predicate(message))
+                    except asyncio.TimeoutError:
+                        break
+                    emoji = str(react)
+                    await message.remove_reaction(emoji, member=user)
+
+                for emoji in emojis:
+                    await message.clear_reaction(emoji)
 
 bot.run(TOKEN)

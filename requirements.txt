@@ -1,4 +1,5 @@
 os
+asyncio
 random
 discord
 json
