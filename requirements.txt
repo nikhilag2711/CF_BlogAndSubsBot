@@ -1,10 +1,5 @@
-os
 asyncio
-random
 discord
-json
 requests
-re
 datetime
-dotenv
-discord.ext
+python-dotenv

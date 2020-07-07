@@ -137,7 +137,7 @@ async def userContestStatus(ctx, handle, id, *args) :
         return
     
     id = helper.isValidInteger(id)
-    url = f'https://codeforces.com/api/user.status?handle={handle}&from=1'
+    url = f'https://codeforces.com/api/contest.status?contestId={id}&handle={handle}&from=1'
     obj = requests.get(url)
     data = json.loads(obj.text)
     
