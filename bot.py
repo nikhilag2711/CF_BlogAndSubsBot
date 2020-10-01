@@ -28,6 +28,18 @@ async def roll(ctx, number_of_dice: int, number_of_sides: int):
     ]
     await ctx.send(', '.join(dice))
 
+@bot.command(name='8ball',help='Shake an 8-ball')
+async def eight_ball(ctx):
+    options_for_8ball = [
+        'Surely, you can count on it to happen',
+        'Don\'t count on it',
+        'I don\'t think so',
+        'No.'
+        'Please try again later! :('
+    ]
+    response = random.choice(options_for_8ball)
+    await ctx.send(response)
+
 @bot.command(name='create-channel', help='Creates a channel in your Discord server.')
 @commands.has_role('admin')
 async def create_channel(ctx, channel_name):
