@@ -273,4 +273,114 @@ async def userContestStatus(ctx, handle, id, *args) :
                 for emoji in emojis:
                     await message.clear_reaction(emoji)
 
+@bot.command(name='stalk', help='Displays user\'s latest solved problems.', usage='handle id [+contest] [+practice] [+unofficial] [+virtual]')
+async def user_ques(ctx, handle, *args):
+    url = f'{CF_USER_STATUS}{handle}&from=1'
+    obj = requests.get(url)
+    data = json.loads(obj.text)
+    if data['status'] == "FAILED":
+        await ctx.send(f'{data["comment"]}')
+        return
+    elif len(data['result']) == 0:
+        await ctx.send(f'{handle} has made no submissions yet.')
+        return
+
+    official, virtual, practice, unoff = False, False, False, False
+    var = 0
+    embeds, val = [], ''
+    ques = []
+
+    for arg in args:
+        if arg == '+contest':
+            official = True
+        elif arg == '+virtual':
+            virtual = True
+        elif arg == '+practice':
+            practice = True
+        elif arg == '+unofficial':
+            unoff = True
+        else :
+            await ctx.send('Invalid arguments. Please enter correct arguments and then try again.')
+            return
+
+    for prob in data['result']:
+        idx = str(prob['contestId']) + prob['problem']['index']
+        part = prob["author"]["participantType"]
+        check = utils.check_status(official, virtual, practice, unoff, part)
+        if prob['verdict'] == 'OK' and check == 1 and idx not in ques:
+            if var%10==0 :
+                embed = discord.Embed(color=0x000000)
+            url = f'{CF_PROBLEM}'
+            url += str(prob['contestId'])
+            url += '/'
+            url += prob["problem"]["index"]
+            ques.append(idx)
+            if 'rating' not in prob["problem"]:
+                rat = '?'
+            else :
+                rat = prob['problem']['rating']
+            tmp = f'[({prob["contestId"]}{prob["problem"]["index"]}) {prob["problem"]["name"]}]({url}) [{rat}]\n'
+            val += tmp
+            var = var + 1
+            if var%10==0 :
+                embed.add_field(name=f'{handle}\'s latest Accepted solutions :', value=val, inline=True)
+                val = ''
+                embeds.append(embed)
+            if var == 100:
+                break
+    
+    if var == 0:
+        await ctx.send(f'{handle} has not yet submitted a correct solution in the given range.')
+        return
+
+    if var%10 != 0 :
+        embed.add_field(name=f'{handle}\'s latest Accepted solutions :', value=val, inline=False)
+        embeds.append(embed)
+    
+    i = 0
+    for embed in embeds:
+        embed.set_footer(text=f'\nPage : {i+1}/{len(embeds)}')
+        i += 1
+    message = await ctx.channel.send(embed=embeds[0])
+    emojis = ['\u23ee', '\u25c0', '\u25b6', '\u23ed']
+    for emoji in emojis:
+        await message.add_reaction(emoji)
+
+    i, emoji = 0, ''
+    while True :
+        if emoji == '\u23ee' :
+            i = 0
+            await message.edit(embed = embeds[i])
+        if emoji == '\u25c0' :
+            if i > 0 :
+                i = i - 1
+                await message.edit(embed=embeds[i])
+        if emoji == '\u25b6' :
+            if i < len(embeds) - 1 :
+                i = i + 1
+                await message.edit(embed=embeds[i])
+        if emoji == '\u23ed' :
+            i = len(embeds) - 1
+            await message.edit(embed=embeds[i])
+        
+        def predicate(message):
+            def check(reaction, user):
+                if reaction.message.id != message.id or user == bot.user:
+                    return False
+                for em in emojis :
+                    if reaction.emoji == em :
+                        return True
+                return False
+            return check
+        
+        try:
+            react, user = await bot.wait_for('reaction_add', timeout=15, check=predicate(message))
+        except asyncio.TimeoutError:
+            break
+        emoji = str(react)
+        await message.remove_reaction(emoji, member=user)
+
+    for emoji in emojis:
+        await message.clear_reaction(emoji)
+
 bot.run(TOKEN)
